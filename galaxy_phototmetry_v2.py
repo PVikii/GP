@@ -507,10 +507,10 @@ class galaxy_photometry:
         ax3.set_title('Residual',pad=40)
         
         plt.savefig(self.file_name+str(self.i)+"_model_elipses.png")
+        
+        
 
     def plot_ellipses(self):    # MAIN PLOTIING SECTION
-
-#TODO   IF the  astep bigger than 3  use 1 extra step 
 
         last_ellips_index=self.last_valid_index+3./self.px_scale/self.astep if self.last_valid_index+3./self.px_scale/self.astep < len(self.isolist.sma) -1 else len(self.isolist.sma) -1 #setting the border of the image 3 arcsec  bigger than the last valid index if that value is inside the image bourders  (  float(self.data.shape[0]/self.astep) / 2.+1; the +1 is  last index of the list +1 to obtain all the elemnets  with the [:x] task) 
         last_ellips= int(self.isolist.sma[int(last_ellips_index)])   # sma of the last ellips
@@ -588,10 +588,11 @@ class galaxy_photometry:
         plt.ylabel('Dec') 
         print(self.target_name.replace(" ", "")) 
         plt.savefig("Finals_"+self.target_name.replace(" ", "")+str(self.i)+"_elipses.png")
-
+        
+########################################################### MAIN ######################################################################################################
 if __name__ == '__main__':
 
-### Getting the parameters
+# Getting the parameters
 
     parser = argparse.ArgumentParser(description='Fits ellipses to an  image and returns the central coordinates, PA, Ellipticity. A table with the photometry results.')
     parser.add_argument('-fits_name', required=True, help='Name of the fits image.')
@@ -642,7 +643,7 @@ if __name__ == '__main__':
     
     sys.stdout=open(g_p.file_name+".out","w") # save the print commands output into a file 
     
-    ### Setting up the parameters
+    # Setting up the parameters
     if (x0):
         g_p.x0=x0
     if (y0):
