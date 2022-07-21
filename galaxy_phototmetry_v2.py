@@ -6,7 +6,7 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-#plt.style.use("viki");
+#plt.style.use("gp");
 
 import numpy as np
 import sys
@@ -771,7 +771,7 @@ if __name__ == '__main__':
     print("Error ellip  median", np.mean(g_p.isolist.ellip_err[:g_p.last_valid_index])) # mean ellip error value inside the galaxy
     print("Error PA median", np.mean(g_p.isolist.pa_err[:g_p.last_valid_index])) # mean PA error value inside the galaxy
     print("Zero Point", g_p.zp)
-    print("isophotal mag",np.nanmean(mag_star(zp, g_p.isolist.intens[g_p.last_valid_index-5:g_p.last_valid_index+5]/g_p.px_scale/g_p.px_scale)))
+    print("isophotal mag",np.nanmean(mag_star(zp, g_p.isolist.intens[g_p.last_valid_index-15:g_p.last_valid_index+15]/g_p.px_scale/g_p.px_scale)))  #to minimize the effect of the background fluctuations in low intensities a bigger range was used.
     #Calculating SMA error     
     intens_error=np.mean(g_p.isolist.int_err[:g_p.last_valid_index])
     intens_low=g_p.isolist.intens[g_p.last_valid_index]-intens_error
