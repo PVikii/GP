@@ -466,7 +466,7 @@ class galaxy_photometry:
        
             
     def plot_model_image(self): #plots the reziduals  in an area 2x size of galaxy     
-        last_ellips=2*self.last_valid_index-1 if 2*self.last_valid_index <len(self.isolist.sma)-1 else len(self.isolist.sma)-1   # verify if the galaxy size is outside of the borders of the image 
+        last_ellips=2*self.last_valid_index*self.astep-1 if 2*self.last_valid_index*self.astep <float(self.data.shape[0]) / 2. else float(self.data.shape[0]) / 2.-1    # verify if the galaxy size is outside of the borders of the image 
         model_image = build_ellipse_model(self.data.shape, self.isolist) # reconstruct the model based on the calculated intensities inside consecutive ellipses.  
         residual = self.data - model_image # original image minus model 
         
