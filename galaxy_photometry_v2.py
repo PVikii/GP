@@ -6,16 +6,19 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-#plt.style.use("gp");
+import matplotlib 
+plt.style.use("viki");
+
+
 
 import numpy as np
 import sys
 import matplotlib as mpl   #setup the cmap colours
 from copy import deepcopy
-import argpar
 import argparse
 import warnings
 import os.path 
+import time
 
 
 from astropy.modeling import models, fitting    # Fitting specific function to the intensities 
@@ -24,8 +27,9 @@ from scipy.optimize import curve_fit
 from astropy.io import fits
 from astropy.wcs import WCS
 
+
 from photutils.isophote import EllipseGeometry, Ellipse, build_ellipse_model 
-from photutils import Background2D, MedianBackground
+from photutils.background import Background2D, MedianBackground
 #from itertools import groupby    #calculating the cutoff index
 #from operator import itemgetter, sub   #  "itemgetter" used only for cutoff index
 
@@ -98,7 +102,7 @@ class galaxy_photometry:
         
         self.hdul = fits.open(self.fits_name)                    # full open fits file
         self.data = self.hdul[0].data                            # image part of the fits file
-        self.header=WCS(self.hdul[0].header)                     #coordinates from the fits file
+        self.header=WCS(self.hdul[0])                     #coordinates from the fits file
         self.x0 = float(self.data.shape[0]) / 2.                # galaxy center
         self.y0 = float(self.data.shape[1]) / 2.                # galaxy center
         self.maxsma = self.x0 if self.x0 > self.y0 else self.y0  #self.data.shape[0]  #  the maximum semi major axis value is half of the image size 
@@ -190,14 +194,14 @@ class galaxy_photometry:
         print("Background", np.min(self.bkg.background), np.max(self.bkg.background))
         
     def substract_bkg(self): # set the image background to 0, by subtracting the median background and plots the result. 
-   
-        fig, (ax1, ax2, ax3) = plt.subplots(figsize=(24, 7),nrows=1, ncols=3)     
-       
+        fig, (ax1, ax2, ax3) = plt.subplots(figsize=(18, 5),nrows=1, ncols=3)     
         #original image
         im1=ax1.imshow(self.data, origin='lower', cmap= self.cmap,vmin=-0.5, vmax=0.5)
         plt.colorbar(im1, ax=ax1)
         ax1.set_title('Reduced image',pad=40)
         ax1.grid(color='white', ls='--')
+        ax1.set_xlabel('x0 (pix)')
+        ax1.set_ylabel('y0 (pix)')
        
         self.data=self.data-self.bkg.background                    #  DATA-BACKGROUND MODEL
         
@@ -208,6 +212,8 @@ class galaxy_photometry:
         im2=ax2.imshow(self.bkg.background, origin='lower', cmap= self.cmap)
         plt.colorbar(im2, ax=ax2)
         ax2.set_title('Background',pad=40)
+        ax2.set_xlabel('x0 (pix)')
+        ax2.set_ylabel('y0 (pix)')
         ax2.grid(color='white', ls='--')
         
         #background subtracted data
@@ -215,10 +221,14 @@ class galaxy_photometry:
         plt.colorbar(im3, ax=ax3)
         ax3.set_title('Background substracted',pad=40)
         ax3.grid(color='white', ls='--')
+        ax3.set_xlabel('x0 (pix)')
+        ax3.set_ylabel('y0 (pix)')
         plt.savefig(self.file_name+str(self.i)+"_background_model.png")
-        plt.show(block=False)  
-        plt.pause(3)
+        plt.pause(10)
         plt.close()
+        
+        
+ 
 
     def create_ellipses(self):   #  most important function it generates the isolist file which contains the fitted ellipses and their details.  https://photutils.readthedocs.io/en/stable/isophote.html
         
@@ -227,11 +237,12 @@ class galaxy_photometry:
         ellipse = Ellipse(self.data, geometry)
         params=ellipse.fit_isophote(5) #helping for decision of the new parameters in case of low s/n, it fits only one isophote 
         print("parameters for sma 5",params.x0,params.y0,params.eps,params.pa )
-        self.isolist = ellipse.fit_image(maxsma=self.maxsma,minsma=self.sma,step=self.astep) #,maxrit=1) #,integrmode='median' 
-        if  (self.isolist.sma.size <1) : 
-                print("Failed:", self.isolist.sma, "Check the fits image for new input parameters!")
+        self.isolist = ellipse.fit_image(maxsma=self.maxsma,minsma=self.sma,step=self.astep) #, maxrit=1) #,integrmode='median' 
+        if  (self.isolist.sma.size <1): 
+                print("Failed:", self.isolist.sma, "Check the fits image  or .out file for the results at sma 5  and try  new input parameters!", file=sys.stderr)
                 exit(0)
         self.i = self.i + 1
+#TODO enable to read data 
      #  data = pickle.load(open("save.p", "rb"))        # Open saved data files and read into a variable
      #  self.isolist = data
 
@@ -246,7 +257,8 @@ class galaxy_photometry:
             min_y0_err = max(self.isolist.y0) - min(self.isolist.y0)
             min_y0_err = 5.  if min_y0_err < 1 else min_y0_err
            
-            fig, (ax1,ax2) = plt.subplots(1,2)  
+            fig, (ax1,ax2) = plt.subplots(1,2,figsize=(8,5))  
+          # plt.tight_layout()
              
             #plots the weighted average in case for the central coordinates and their fluctuations
             ax1.errorbar(self.isolist.sma, self.isolist.x0, yerr=np.array(list(map(lambda x: x if x < min_x0_err else min_x0_err, self.isolist.x0_err))), fmt='o',markersize=4, ecolor='skyblue',zorder=1)
@@ -255,17 +267,17 @@ class galaxy_photometry:
               #  self.x0=np.median(self.isolist.x0[:self.last_valid_index])   # by using the median the outer part of the galaxy gets more effect in the calculations
                 self.x0 = get_weighted_avg(self.isolist.x0[:self.last_valid_index],self.isolist.x0_err[:self.last_valid_index])  #x center coordinate; central  region more effect on the center of the galaxy calculation than the outer region
                 ax1.hlines(y=self.x0,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index], linestyle='--', color='m', zorder=3)
-                ax1.annotate(str(self.x0), (0, self.x0))
+                ax1.annotate("{:.2f}".format(self.x0), (self.isolist.sma[self.last_valid_index]-20, self.x0+min_x0_err*3/fig.dpi),fontsize='large')
 
                 #self.y0=np.median(self.isolist.y0[:self.last_valid_index])
                 self.y0 = get_weighted_avg(self.isolist.y0[:self.last_valid_index], self.isolist.y0_err[:self.last_valid_index]) #y center coordinate
                 ax2.hlines(y=self.y0,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index],  linestyle='--', color='m', zorder=4, label="intensity")
-                ax2.annotate(str(self.y0), (0, self.y0))
+                ax2.annotate("{:.2f}".format(self.y0), (self.isolist.sma[self.last_valid_index]-20, self.y0+min_y0_err*3/fig.dpi),fontsize='large')
                 
             ax1.set_xlabel('Semimajor Axis Length (pix)')
-            ax1.set_ylabel('x0')            
+            ax1.set_ylabel('x0 (pix)')            
             ax2.set_xlabel('Semimajor Axis Length (pix)')
-            ax2.set_ylabel('y0')
+            ax2.set_ylabel('y0 (pix)')
 
             plt.savefig(self.file_name+str(self.i)+"_1.png")
             
@@ -276,13 +288,21 @@ class galaxy_photometry:
             plt.plot(self.isolist.sma[self.last_valid_index]*self.px_scale, self.isolist.intens[self.last_valid_index],"o", color='m' )
             plt.axvline(x=self.isolist.sma[self.last_valid_index]*self.px_scale, color='m', linestyle='--')
     
-            plt.xlabel('Semimajor Axis Length (arcsec)')
-            plt.ylabel('Isophotal intensity')
+            plt.xlabel('Semimajor Axis Length (asec)')
+            plt.ylabel('Isophotal intensity ($I/asec^2$)')
             
             plt.savefig(self.file_name+str(self.i)+"_2.png")     
             
             #plot isophotal magnitude          
             plt.figure()
+
+            mag_list=(np.array(mag_star(self.zp, self.isolist.intens/ self.px_scale / self.px_scale)))  #converting intensity to magnitude, including the instrumental magnitude
+            mag_err_list=2*1.08/self.isolist.intens*self.isolist.int_err 
+            mag_err_list[mag_err_list<0]=0           #converting the intensity errors into magnitude errors using the error propagation formula 
+            plt.errorbar(self.isolist.sma*self.px_scale, mag_list, yerr= mag_err_list,  ecolor='skyblue',zorder=1,label="GPv2") 
+            #plt.plot(self.isolist.sma[self.last_valid_index]*self.px_scale,mag_list[self.last_valid_index],"o", color='m',zorder=3 )                
+            plt.axvline(x=self.isolist.sma[self.last_valid_index]*self.px_scale, color='m', linestyle='--',zorder=4)
+            
             if (self.iraf_result_file) :   # in case verification file exists 
                 X =[]
                 Y= []
@@ -293,15 +313,11 @@ class galaxy_photometry:
                         X.append(values[0])
                         Y.append(values[1])
                         Z.append(values[2])
-                plt.plot(np.array(X)*self.px_scale, np.array(Y),zorder=4)
-                
-            mag_list=(np.array(mag_star(self.zp, self.isolist.intens/ self.px_scale / self.px_scale)))  #converting intensity to magnitude, including the instrumental magnitude
-            mag_err_list=2*1.08/self.isolist.intens*self.isolist.int_err            #converting the intensity errors into magnitude errors using the error propagation formula 
-            plt.errorbar(self.isolist.sma*self.px_scale, mag_list, yerr= mag_err_list, fmt='o',   markersize=4, ecolor='skyblue',zorder=3) 
-            plt.plot(self.isolist.sma[self.last_valid_index]*self.px_scale,mag_list[self.last_valid_index],"o", color='m',zorder=2 )
-            plt.axvline(x=self.isolist.sma[self.last_valid_index]*self.px_scale, color='m', linestyle='--',zorder=1)
-            plt.xlabel('Semimajor Axis Length (arcsec)')
-            plt.ylabel('Isophotal magnitude')
+                plt.plot(np.array(X)*self.px_scale, np.array(Y),'o',label="Iraf",markersize=4,zorder=2)
+                plt.legend()
+                            
+            plt.xlabel('Semimajor Axis Length (asec)')
+            plt.ylabel('Isophotal magnitude ($m_{Ks}$/asec$^2$)')
             extra=(max(mag_list) -min(mag_list) )*0.05   
             plt.ylim([max(mag_list)+extra, min(mag_list)-extra])   # set correct inverse plotting range
             plt.savefig(self.file_name+str(self.i)+"_3.png")     
@@ -309,15 +325,15 @@ class galaxy_photometry:
             # plotting  the total magnitude/ellipses in function of SMA
             plt.figure()
             plt.gca().invert_yaxis()
-            magnitude_list = mag_star(self.zp,self.isolist.tflux_e / self.px_scale / self.px_scale)   #converting intensity to magnitude, including the instrumental magnitude
+            magnitude_list = mag_star(self.zp,self.isolist.tflux_e)   #converting intensity to magnitude, including the instrumental magnitude
             final_mag=magnitude_list[self.last_valid_index]
             t_mag_error=np.mean(1.08/self.isolist.intens[:self.last_valid_index]*self.isolist.int_err[:self.last_valid_index] )  #,np.mean(1.08/self.isolist.intens[self.last_valid_index-5:self.last_valid_index+5]*self.isolist.int_err[self.last_valid_index-5:self.last_valid_index+5] )
             print("final_magnitude",final_mag,"intens_error in intens and mean magnitude error, magnitude error:", self.isolist.int_err[self.last_valid_index], t_mag_error)   # printing  the total magnitude and the  error value   
             plt.plot(self.isolist.sma*self.px_scale, magnitude_list)
             plt.plot(self.isolist.sma[self.last_valid_index:]*self.px_scale , [final_mag] * len(self.isolist.sma[self.last_valid_index:]), '-.')
-            plt.xlabel('Semimajor Axis Length (arcsec)')
+            plt.xlabel('Semimajor Axis Length (asec)')
             plt.ylabel('Total magnitude')
-            plt.annotate(str(final_mag), (self.isolist.sma[self.last_valid_index]*self.px_scale,final_mag ))
+            plt.annotate("{:.2f}".format(final_mag), (self.isolist.sma[self.last_valid_index]*self.px_scale,final_mag ))
             plt.savefig(self.file_name+str(self.i)+"_4.png")
             
             plt.close()
@@ -348,23 +364,22 @@ class galaxy_photometry:
 ###########################################################Creating the plots######################################################################################################
     def plot_4_quadrant(self): # Plots the 4 most important parameter and their mean values what will be used later for fixing the parameters
     
-       plt.figure(figsize=(8, 8), dpi=1600)
+       plt.figure(figsize=(8, 8),dpi=100)
        plt.subplots_adjust(hspace=0.35, wspace=0.35)
        
         #Ellipticity 
        ax=plt.subplot(2, 2, 1)     
  #      self.ellip=np.median(self.isolist.eps[:self.last_valid_index] )     # the outer region’s ellipticity more effect in the final ellipticity than the center region
-       self.ellip = get_weighted_avg(self.isolist.eps[:self.last_valid_index], self.isolist.ellip_err[:self.last_valid_index]) #  define  the average ellipticity, later on used as fixed value 
-         
-       plt.hlines(y=self.ellip,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index],  linestyle='--', color='m', zorder=3) # average ellipticity value  inside the galaxy 
-       plt.annotate(str(self.ellip), (0, self.ellip))
-       plt.errorbar(self.isolist.sma, self.isolist.eps, yerr=self.isolist.ellip_err, fmt='o', markersize=4, ecolor='skyblue')
+       self.ellip = get_weighted_avg(self.isolist.eps[:self.last_valid_index], self.isolist.ellip_err[:self.last_valid_index]) #  define  the average ellipticity, later on used as fixed value  
+       plt.hlines(y=1.-self.ellip,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index],  linestyle='-', color='m', zorder=3,linewidth=3) # average ellipticity value  inside the galaxy 
+       plt.annotate("{:.2f}".format(1.-self.ellip), (self.isolist.sma[self.last_valid_index], 1.-self.ellip)) #, weight="bold"
+       plt.errorbar(self.isolist.sma, 1.-self.isolist.eps, yerr=self.isolist.ellip_err, fmt='o', markersize=4, ecolor='skyblue')
        plt.xlabel('Semimajor Axis Length (pix)')
-       plt.ylabel('Ellipticity')
+       plt.ylabel('b/a')
        plt.locator_params(axis='y', nbins=6)
        plt.locator_params(axis='x', nbins=10)
-       extra=(max(self.isolist.eps) -min(self.isolist.eps) )*0.05   
-       plt.ylim([ min(self.isolist.eps)-extra,max(self.isolist.eps)+extra])
+       extra=(max(1-self.isolist.eps) -min(1-self.isolist.eps) )*0.05    #TODO VIKI ADD constant if this value 0 
+       plt.ylim([ min(1-self.isolist.eps)-extra,max(1-self.isolist.eps)+extra])
        plt.gca().set_xlim(left=0)
        xleft, xright = ax.get_xlim()
        ybottom, ytop = ax.get_ylim()
@@ -372,19 +387,16 @@ class galaxy_photometry:
        
        #PA
        ax1=plt.subplot(2, 2, 2) 
-       min_pa0_err = (max(self.isolist.pa) - min(self.isolist.pa))
-       if min_pa0_err < 1:
-            min_pa0_err = 3.
        plt.errorbar(self.isolist.sma, self.isolist.pa, yerr= self.isolist.pa_err, fmt='o', markersize=4, ecolor='skyblue')
        self.pa=np.arctan2(get_weighted_avg(np.sin(self.isolist.pa[:self.last_valid_index]),self.isolist.pa_err[:self.last_valid_index]),  get_weighted_avg(np.cos(self.isolist.pa[:self.last_valid_index]),self.isolist.pa_err[:self.last_valid_index]))  #  average PA value  inside the galaxy size : https://en.wikipedia.org/wiki/Mean_of_circular_quantities
-       plt.hlines(y=self.pa,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index],  linestyle='--', color='m', zorder=3)
-       plt.annotate(str(self.pa), (0, self.pa))
+       plt.hlines(y=self.pa,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index],  linestyle='-', color='m', zorder=3,linewidth=3)
+       plt.annotate("{:.2f}".format(self.pa), (self.isolist.sma[self.last_valid_index], self.pa))
        plt.xlabel('Semimajor Axis Length (pix)')
        plt.ylabel('PA (deg)')
        plt.locator_params(axis='y', nbins=6)
        plt.locator_params(axis='x', nbins=10)
        extra=(max(self.isolist.pa) -min(self.isolist.pa) )*0.05
-       plt.ylim([max(self.isolist.pa)+extra, min(self.isolist.pa)-extra])
+       plt.ylim([ min(self.isolist.pa)-extra,max(self.isolist.pa)+extra])
        plt.gca().set_xlim(left=0)
        xleft, xright = ax1.get_xlim()
        ybottom, ytop = ax1.get_ylim()
@@ -392,18 +404,15 @@ class galaxy_photometry:
 
        #x center coord
        ax2=plt.subplot(2, 2, 3) 
-       min_x0_err = max(self.isolist.x0) - min(self.isolist.x0)
-       if min_x0_err < 1:
-           min_x0_err = 5.
        plt.errorbar(self.isolist.sma, self.isolist.x0, yerr=self.isolist.x0_err, fmt='o',  markersize=4, ecolor='skyblue') 
-       plt.hlines(y=self.x0,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index],  linestyle='--', color='m', zorder=3) # the average x was calculated in step  plot_verify_last_valid_index
-       plt.annotate(str(self.x0), (0, self.x0))
+       plt.hlines(y=self.x0,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index],  linestyle='-', color='m', zorder=3,linewidth=3) # the average x was calculated in step  plot_verify_last_valid_index
+       plt.annotate("{:.2f}".format(self.x0), (self.isolist.sma[self.last_valid_index], self.x0))
        plt.xlabel('Semimajor Axis Length (pix)')
-       plt.ylabel('x0')
+       plt.ylabel('x0 (pix)')
        plt.locator_params(axis='y', nbins=6)
        plt.locator_params(axis='x', nbins=10)
        extra=(max(self.isolist.x0) -min(self.isolist.x0) )*0.05
-       plt.ylim([max(self.isolist.x0)+extra, min(self.isolist.x0)-extra])
+       plt.ylim([min(self.isolist.x0)-extra,max(self.isolist.x0)+extra])
        plt.gca().set_xlim(left=0)
        xleft, xright = ax2.get_xlim()
        ybottom, ytop = ax2.get_ylim()
@@ -411,18 +420,15 @@ class galaxy_photometry:
 
        #y center coord
        ax3=plt.subplot(2, 2, 4) 
-       min_y0_err = max(self.isolist.y0) - min(self.isolist.y0)
-       if min_y0_err < 1:
-            min_y0_err = 5.
        plt.errorbar(self.isolist.sma, self.isolist.y0, yerr=self.isolist.y0_err, fmt='o',   markersize=4, ecolor='skyblue')  
-       plt.hlines(y=self.y0,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index], linestyle='--', color='m', zorder=3 ) # the average y was calculated in step  plot_verify_last_valid_index
-       plt.annotate(str(self.y0), (0, self.y0))
+       plt.hlines(y=self.y0,xmin=self.isolist.sma[0], xmax=self.isolist.sma[self.last_valid_index], linestyle='-', color='m', zorder=3,linewidth=3 ) # the average y was calculated in step  plot_verify_last_valid_index
+       plt.annotate("{:.2f}".format(self.y0), (self.isolist.sma[self.last_valid_index], self.y0))
        plt.xlabel('Semimajor Axis Length (pix)')
-       plt.ylabel('y0')
+       plt.ylabel('y0 (pix)')
        plt.locator_params(axis='y', nbins=6)
        plt.locator_params(axis='x', nbins=10)
-       extra=(max(self.isolist.y0) -min(self.isolist.y0) )*0.05
-       plt.ylim([max(self.isolist.y0)+extra, min(self.isolist.y0)-extra])
+       extra=(max(self.isolist.y0) -min(self.isolist.y0) )*0.05   #reduce the effect of teh error bar in the scaling 
+       plt.ylim([min(self.isolist.y0)-extra,max(self.isolist.y0)+extra])
        plt.gca().set_xlim(left=0)
        xleft, xright = ax3.get_xlim()
        ybottom, ytop = ax3.get_ylim()
@@ -434,8 +440,8 @@ class galaxy_photometry:
     def plot_mag_iso_functions(self):  #Test fits with basic functions: exp, sersic, vaucouleurs  
         plt.figure()
         plt.gca().invert_yaxis()
-        plt.xlabel('Semimajor Axis Length (arcsec)')
-        plt.ylabel('Isophotal intensity')
+        plt.xlabel('Semimajor Axis Length (asec)')
+        plt.ylabel('Isophotal intensity ($I/asec^2$)')
 
         sma=np.array(self.isolist.sma) * self.px_scale # converting pixel to arcsec 
         plt.plot(sma,self.isolist.intens ,'.',label="isophot_mag")
@@ -466,7 +472,7 @@ class galaxy_photometry:
        
             
     def plot_model_image(self): #plots the reziduals  in an area 2x size of galaxy     
-        last_ellips=2*self.last_valid_index*self.astep-1 if 2*self.last_valid_index*self.astep <float(self.data.shape[0]) / 2. else float(self.data.shape[0]) / 2.-1    # verify if the galaxy size is outside of the borders of the image 
+        last_ellips=2*self.last_valid_index*self.astep-1 if 2*self.last_valid_index*self.astep <float(self.data.shape[0]) / 2. else float(self.data.shape[0]) / 2.-1      # verify if the galaxy size is outside of the borders of the image 
         model_image = build_ellipse_model(self.data.shape, self.isolist) # reconstruct the model based on the calculated intensities inside consecutive ellipses.  
         residual = self.data - model_image # original image minus model 
         
@@ -487,30 +493,30 @@ class galaxy_photometry:
             x, y, = iso.sampled_coordinates()
             ax1.plot(x-int(self.x0-last_ellips), y-int(self.y0-last_ellips), color=color)  
             color=color-[0.06,0.06,0]
-        ax1.set_xlabel('x0')
-        ax1.set_ylabel('y0')
+        ax1.set_xlabel('x0 (pix)')
+        ax1.set_ylabel('y0 (pix)')
         plt.grid(color='white', ls='dotted')
 
         #model
         ax2.imshow(model_image[int(self.y0-last_ellips):int(self.y0+last_ellips),int(self.x0-last_ellips):int(self.x0+last_ellips)], origin='lower', cmap= self.cmap,vmin=np.percentile(self.data, self.vmin),  aspect='equal')
         ax2.set_title('Ellipse Model',pad=40)
         ax2.ticklabel_format(style='plain')    
-        ax2.set_xlabel('x0')
-        ax2.set_ylabel('y0')
+        ax2.set_xlabel('x0 (pix)')
+        ax2.set_ylabel('y0 (pix)')
         plt.grid(color='white', ls='dotted')
 
         #residuals
         ax3.imshow(residual[int(self.y0-last_ellips):int(self.y0+last_ellips),int(self.x0-last_ellips):int(self.x0+last_ellips)], origin='lower', cmap= self.cmap,vmin=np.percentile(self.data, self.vmin),  aspect='equal')
-        ax3.set_xlabel('x0')
-        ax3.set_ylabel('y0')
+        ax3.set_xlabel('x0 (pix)')
+        ax3.set_ylabel('y0 (pix)')
         plt.grid(color='white', ls='dotted')
         ax3.set_title('Residual',pad=40)
         
         plt.savefig(self.file_name+str(self.i)+"_model_elipses.png")
-        
-        
 
     def plot_ellipses(self):    # MAIN PLOTIING SECTION
+
+#TODO   IF the  astep bigger than 3  use 1 extra step 
 
         last_ellips_index=self.last_valid_index+3./self.px_scale/self.astep if self.last_valid_index+3./self.px_scale/self.astep < len(self.isolist.sma) -1 else len(self.isolist.sma) -1 #setting the border of the image 3 arcsec  bigger than the last valid index if that value is inside the image bourders  (  float(self.data.shape[0]/self.astep) / 2.+1; the +1 is  last index of the list +1 to obtain all the elemnets  with the [:x] task) 
         last_ellips= int(self.isolist.sma[int(last_ellips_index)])   # sma of the last ellips
@@ -519,14 +525,14 @@ class galaxy_photometry:
         
         #changing the ra dec  header values to the  values at the center of the frame 
         new_header= deepcopy(self.header)  
-        new_coord= self.header.pixel_to_world(int(self.data.shape[0]/2), int(self.data.shape[1]/2))  
+        new_coord=self.header.pixel_to_world(int(self.data.shape[0]/2), int(self.data.shape[1]/2))  
         new_header.wcs.crpix = [last_ellips,last_ellips]  
-        new_header.wcs.crval=[new_coord.ra.deg,new_coord.dec.deg]
-     
-        plt.figure(figsize=(30, 7 ))
+        new_header.wcs.crval=[new_coord.ra.deg,new_coord.dec.deg]        
+        
+        plt.figure(figsize=(23, 6 ))
         
         plt.rc('font', size=14.5) 
-        plt.subplots_adjust(hspace=0.2, wspace=0.35)
+        plt.subplots_adjust(hspace=0.2, wspace=0.45)
  
         #plot original image        
         plt.subplot(141)
@@ -541,11 +547,12 @@ class galaxy_photometry:
         ax=plt.subplot(142)
         plt.gca().invert_yaxis()
         mag_err_list=2*1.08/self.isolist.intens[:int(last_ellips_index)]*self.isolist.int_err[:int(last_ellips_index)]  #2x magnitude errors based on  error propagation formula 
+        mag_err_list[mag_err_list<0]=0 
         plt.errorbar(self.isolist.sma[:int(last_ellips_index)]*self.px_scale, iso_mag, yerr=mag_err_list, fmt='o',   markersize=4, ecolor='skyblue') 
         plt.plot(self.isolist.sma[self.last_valid_index]*self.px_scale,       iso_mag[self.last_valid_index],"o", color='m' )
         plt.axvline(x=self.isolist.sma[self.last_valid_index]*self.px_scale, color='m', linestyle='--', label = "$sma_{TK}$")  # marking for the  calculated size of the galaxy 
-        plt.xlabel('Semimajor Axis (arcsec)')
-        plt.ylabel('Isophotal magnitude (Ks mag/sq.arcsec)')
+        plt.xlabel('Semimajor Axis (asec)')
+        plt.ylabel('Isophotal magnitude ($m_{Ks}$/asec$^2$)')
         extra=(max(iso_mag) -min(iso_mag) )*0.05 
         plt.ylim([max(iso_mag)+extra, min(iso_mag)-extra])
         plt.gca().set_xlim(left=0)
@@ -555,9 +562,11 @@ class galaxy_photometry:
         ax.legend()
 
         #    input image with the overplotted ellipses 
-        ax1= plt.subplot(143, projection=new_header)
-        ax1.coords['ra'].set_major_formatter('hh:mm:ss.ss')
-        ax1.coords['ra'].set_ticks(number=4)                      
+        wcs=new_header
+        ax1= plt.subplot(143, projection=wcs)
+        
+        ax1.coords['ra'].set_major_formatter('hh:mm:ss.s')
+        ax1.coords['ra'].set_ticks(number=3)                     
         plt.imshow(self.data[int(self.y0-last_ellips):int(self.y0+last_ellips),int(self.x0-last_ellips):int(self.x0+last_ellips)], origin='lower', cmap= self.cmap,vmin=np.percentile(self.data, self.vmin),  aspect='equal')   
         plt.xlabel('RA')
         plt.ylabel('Dec')      
@@ -577,10 +586,12 @@ class galaxy_photometry:
         plt.arrow(2, 2, 10./self.px_scale,0, head_width=0, head_length=0,fc='white', ec='black', width=0.003)  # plot a 10"  size bar for scaling 
         plt.text(2, 5, '10"',  color='black')    
 
+
         # Input image - modelled ellipses 
         ax2=plt.subplot(144, projection=new_header)
-        ax2.coords['ra'].set_major_formatter('hh:mm:ss.ss')
-        ax2.coords['ra'].set_ticks(number=4) 
+        ax2.coords['ra'].set_major_formatter('hh:mm:ss.s')
+        ax2.coords['ra'].set_ticks(number=3) 
+        ax2.coords['ra'].tick_params(rotation=45)
         model_image = build_ellipse_model(self.data.shape, self.isolist)
         residual = self.data - model_image
         plt.imshow(residual[int(self.y0-last_ellips):int(self.y0+last_ellips),int(self.x0-last_ellips):int(self.x0+last_ellips)], origin='lower', cmap= self.cmap,vmin=np.percentile(self.data, self.vmin),  aspect='equal')
@@ -588,11 +599,10 @@ class galaxy_photometry:
         plt.ylabel('Dec') 
         print(self.target_name.replace(" ", "")) 
         plt.savefig("Finals_"+self.target_name.replace(" ", "")+str(self.i)+"_elipses.png")
-        
-########################################################### MAIN ######################################################################################################
+
 if __name__ == '__main__':
 
-# Getting the parameters
+### Getting the parameters
 
     parser = argparse.ArgumentParser(description='Fits ellipses to an  image and returns the central coordinates, PA, Ellipticity. A table with the photometry results.')
     parser.add_argument('-fits_name', required=True, help='Name of the fits image.')
@@ -643,7 +653,7 @@ if __name__ == '__main__':
     
     sys.stdout=open(g_p.file_name+".out","w") # save the print commands output into a file 
     
-    # Setting up the parameters
+    ### Setting up the parameters
     if (x0):
         g_p.x0=x0
     if (y0):
@@ -753,7 +763,7 @@ if __name__ == '__main__':
     pickle.dump(g_p.isolist, open(g_p.file_name+"_Final.p", "wb"))  
     
     # print out physical parameters and important information 
-    print("Min/ Max x0, ellip, pa", min(g_p.isolist.x0),max(g_p.isolist.x0), min(g_p.isolist.eps),max(g_p.isolist.eps),  min(g_p.isolist.pa),max(g_p.isolist.pa), )      
+    print("Min/ Max x0, ellip, pa", min(g_p.isolist.x0),max(g_p.isolist.x0), min(1-g_p.isolist.eps),max(1-g_p.isolist.eps),  min(g_p.isolist.pa),max(g_p.isolist.pa), )      
     print("Final geometry:",g_p.x0,g_p.y0,g_p.ellip,g_p.pa,g_p.i) 
     print("x0", g_p.x0)
     print("y0",g_p.y0 ) 
@@ -762,7 +772,7 @@ if __name__ == '__main__':
     print("pa", g_p.pa)
 #    print("pa_error",g_p.isolist.pa_err[min(range(len(g_p.isolist.pa)), key=lambda i: abs(g_p.isolist.pa[i]-g_p.pa))], g_p.isolist.ellip_err[g_p.last_valid_index])
 #    print("ellip_error",g_p.isolist.ellip_err[min(range(len(g_p.isolist.eps)), key=lambda i: abs(g_p.isolist.eps[i]-g_p.ellip))], g_p.isolist.pa_err[g_p.last_valid_index])
-    print("ellip", g_p.ellip)
+    print("ellip",1- g_p.ellip)
     print("px scale", g_p.px_scale)
     print("seeing_header", g_p.seeing_header)
     print("sma", g_p.isolist.sma[g_p.last_valid_index])
@@ -771,7 +781,7 @@ if __name__ == '__main__':
     print("Error ellip  median", np.mean(g_p.isolist.ellip_err[:g_p.last_valid_index])) # mean ellip error value inside the galaxy
     print("Error PA median", np.mean(g_p.isolist.pa_err[:g_p.last_valid_index])) # mean PA error value inside the galaxy
     print("Zero Point", g_p.zp)
-    print("isophotal mag",np.nanmean(mag_star(zp, g_p.isolist.intens[g_p.last_valid_index-15:g_p.last_valid_index+15]/g_p.px_scale/g_p.px_scale)))  #to minimize the effect of the background fluctuations in low intensities a bigger range was used.
+    print("isophotal mag",np.nanmean(mag_star(zp, g_p.isolist.intens[g_p.last_valid_index-15:g_p.last_valid_index+15])))
     #Calculating SMA error     
     intens_error=np.mean(g_p.isolist.int_err[:g_p.last_valid_index])
     intens_low=g_p.isolist.intens[g_p.last_valid_index]-intens_error
@@ -797,4 +807,3 @@ if __name__ == '__main__':
     sys.stdout.close() 
 
     
-
