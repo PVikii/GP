@@ -7,7 +7,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib 
-plt.style.use("viki");
+#plt.style.use("gp");
 
 
 
