@@ -10,19 +10,19 @@ GPv2 attempts  fitting  the galaxy profiles in 4 step. In the first step, the sc
 
 The GPV2 was tested in  Python 3.10.9 environment with the pacakge versions:  matplotlib 3.7.1, astropy 5.2.2, scipy 1.8.1, photutils 1.6.0, numpy 1.22.3 and argparse 1.1 . 
 
-For installing a specific verion of the package use 'sudo apt-get intall python3-astropy==5.0'
+For installing a specific verion of the package use ```sudo apt-get intall python3-astropy==5.0```
 
 ## Usage
 
 The GPv2 has several input parameters options from which the  required imput parameters are 'fits_name', 'target_name', 'zp': 
 
-e.g.: galaxy_photometry_v2.1.py -zp 26.97 -fits_name  nostars.fits -target_name "LEDA 2308331"  
+e.g.: ```galaxy_photometry_v2.1.py -zp 26.97 -fits_name  nostars.fits -target_name "LEDA 2308331"  ```
 
 But most of the cases the png name is different than the name of the fits and  some of the initial parameters are chaged  for a better approximation for the galaxy  shape or size. So one can see a more complex example :
 
-galaxy_photometry_v2.1.py -zp 26.97 -fits_name  nostars.fits  -png_name coadd_cropped_2MASXJ0856_2.0 -target_name "LEDA 2308331" -bkg_scale 4 -sma 5 -x0 238 -y0 237.8   -chk_infl  -no_fix_ellip  -ellip 0.44  -pa 2.5 
+```galaxy_photometry_v2.1.py -zp 26.97 -fits_name  nostars.fits  -png_name coadd_cropped_2MASXJ0856_2.0 -target_name "LEDA 2308331" -bkg_scale 4 -sma 5 -x0 238 -y0 237.8   -chk_infl  -no_fix_ellip  -ellip 0.44  -pa 2.5 ```
 
-The full list of options can be seen from: 'galaxy_photometry_v2.py -h'
+The full list of options can be seen from: ```galaxy_photometry_v2.py -h ```
 
 ## License
 
