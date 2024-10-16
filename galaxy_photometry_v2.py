@@ -2,14 +2,13 @@
 
 # Galaxy surface photometry 
 # Provides isophotal analysis of the target centered in the frame or specified by certain coordinates. 
-# The script attempts a 4 step ellipse fitting and returns different plots for verification and an output file with the information about the script execution steps and physical parameters of the target.
+# The script attempts a 4-step ellipse fitting and returns different plots for verification and an output file with the information about the script execution steps and physical parameters of the target.
+#this program  is a wrapper built around the photutils.isophote package 
 
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib 
 #plt.style.use("gp");
-
-
 
 import numpy as np
 import sys
@@ -118,6 +117,7 @@ class galaxy_photometry:
         self.fix_pa=False     # parameter used as EllipseGeometry fix_pa
         self.fix_eps=False    # parameter used as EllipseGeometry fix_eps 
         self.failed=False     # verifies if a certain step failed 
+        self.faint=False     #If the target is too faint for normal mode isophotal analysis, different method is used.
 
         self.check_intens_fluctuate=True    # search for the 3rd inflection point after reaching the background level,  in case it is fails it stops at the background level. Most of the cases was better results obtained with this parameter kept false. 
         
@@ -160,7 +160,9 @@ class galaxy_photometry:
         try:
             self.filter_name = self.hdul[0].header["FILTER"]
         except:
-            if not self.filter_name:      self.filter_name=get_string("filter_name")
+            if not self.filter_name:     # self.filter_name=get_string("filter_name")
+                self.filter_name= "Ks" #get_string("filter_name")
+                print("Warning: Default filter set Ks!")
     #seeing value from header or external input       
         try:
             self.seeing_header = self.hdul[0].header["FWHM"]   #["FWHM"] 
@@ -174,7 +176,8 @@ class galaxy_photometry:
         try:
             self.combining_method = self.hdul[0].header["COMBINET"]
         except:        
-            if not self.combining_method: self.combining_method=get_string("combining_method")
+            if not self.combining_method:  #self.combining_method=get_string("combining_method")
+                  self.combining_method = "Unknown"
         print("Combining method:"+self.combining_method)
             
     def setup_cmap(self):   # for getting a better representation customized jet colourmap was used  
@@ -235,16 +238,25 @@ class galaxy_photometry:
         geometry = EllipseGeometry(x0=self.x0, y0=self.y0, sma=self.sma, eps=self.ellip, pa=self.pa, fix_center=self.fix_center, fix_pa=self.fix_pa, fix_eps=self.fix_eps, linear_growth=True, astep=self.astep)
         print("grometry ",geometry.sma, geometry.astep,self.x0,self.y0,self.ellip, self.pa)
         ellipse = Ellipse(self.data, geometry)
-        params=ellipse.fit_isophote(5) #helping for decision of the new parameters in case of low s/n, it fits only one isophote 
-        print("parameters for sma 5",params.x0,params.y0,params.eps,params.pa )
-        self.isolist = ellipse.fit_image(maxsma=self.maxsma,minsma=self.sma,step=self.astep) #, maxrit=1) #,integrmode='median' 
+        params=ellipse.fit_isophote(10) #helping for decision of the new parameters in case of low s/n, it fits only one isophote 
+        print("parameters for sma 10",params.x0,params.y0,params.eps,params.pa )
+        if(faint):
+                if(self.i==0):
+                        geometry = EllipseGeometry(x0=params.x0, y0=params.y0, sma=self.sma, eps=params.eps, pa=params.pa, fix_center=self.fix_center, fix_pa=self.fix_pa, fix_eps=self.fix_eps, linear_growth=True, astep=self.astep)     
+                        ellipse = Ellipse(self.data, geometry)
+                self.isolist = ellipse.fit_image(maxsma=self.maxsma,minsma=self.sma,step=self.astep, maxrit=1) #,integrmode='median' 
+        else:
+                self.isolist = ellipse.fit_image(maxsma=self.maxsma,minsma=self.sma,step=self.astep)
         if  (self.isolist.sma.size <1): 
-                print("Failed:", self.isolist.sma, "Check the fits image  or .out file for the results at sma 5  and try  new input parameters!", file=sys.stderr)
+                if(self.i==0):
+                        print("Failed:", self.isolist.sma, "Check the fits image  or .out file for the results at sma 10  and try  new input parameters! If faint object use -faint True.", file=sys.stderr)
                 exit(0)
         self.i = self.i + 1
 #TODO enable to read data 
      #  data = pickle.load(open("save.p", "rb"))        # Open saved data files and read into a variable
      #  self.isolist = data
+        
+
 
 
 #Gets the last valid index and verify it, also creates verification plots. Based on what the other parameters will be calculated.     
@@ -378,7 +390,7 @@ class galaxy_photometry:
        plt.ylabel('b/a')
        plt.locator_params(axis='y', nbins=6)
        plt.locator_params(axis='x', nbins=10)
-       extra=(max(1-self.isolist.eps) -min(1-self.isolist.eps) )*0.05    #TODO VIKI ADD constant if this value 0 
+       extra=(max(1-self.isolist.eps) -min(1-self.isolist.eps) )*0.05   
        plt.ylim([ min(1-self.isolist.eps)-extra,max(1-self.isolist.eps)+extra])
        plt.gca().set_xlim(left=0)
        xleft, xright = ax.get_xlim()
@@ -516,7 +528,7 @@ class galaxy_photometry:
 
     def plot_ellipses(self):    # MAIN PLOTIING SECTION
 
-#TODO   IF the  astep bigger than 3  use 1 extra step 
+
 
         last_ellips_index=self.last_valid_index+3./self.px_scale/self.astep if self.last_valid_index+3./self.px_scale/self.astep < len(self.isolist.sma) -1 else len(self.isolist.sma) -1 #setting the border of the image 3 arcsec  bigger than the last valid index if that value is inside the image bourders  (  float(self.data.shape[0]/self.astep) / 2.+1; the +1 is  last index of the list +1 to obtain all the elemnets  with the [:x] task) 
         last_ellips= int(self.isolist.sma[int(last_ellips_index)])   # sma of the last ellips
@@ -605,26 +617,27 @@ if __name__ == '__main__':
 ### Getting the parameters
 
     parser = argparse.ArgumentParser(description='Fits ellipses to an  image and returns the central coordinates, PA, Ellipticity. A table with the photometry results.')
-    parser.add_argument('-fits_name', required=True, help='Name of the fits image.')
-    parser.add_argument('-target_name', required=True, help='Name of the Galaxy')
-    parser.add_argument('-png_name',help='Name of the png image. Def. same as the fits image name')
-    parser.add_argument("-zp", required=True, type=float, help='The zero point of the image')
-    parser.add_argument("-iraf_file", help='In case one want to compare the python and iraf or other results. File format SMA E_MAG MAG.')
-    parser.add_argument("-x0", type=float, help='Possible center coordinates. Def. center of the image ')
+    parser.add_argument('-fits_name', required=True, help='Name of the fits image. Mandtory.')
+    parser.add_argument('-target_name', required=True, help='Name of the Galaxy. Mandatory.')
+    parser.add_argument('-png_name',help='Name of the png image. Def. same as the fits image name.')
+    parser.add_argument("-zp", required=True, type=float, help='The zero point of the image. Mandatory.')
+    parser.add_argument("-iraf_file", help='In case one want to compare the python and iraf or other results. File format SMA E_MAG MAG. Def. None.')
+    parser.add_argument("-x0", type=float, help='Possible center coordinates. Def. center of the image.')
     parser.add_argument("-y0", type=float, help='Possible center coordinates. Def. center of the image. ')
-    parser.add_argument("-fix_center",type=bool, help='Force the center to be fixed.')
+    parser.add_argument("-fix_center",type=bool, help='Force the center to be fixed. Use it with True or 1 to activate it. ')
     parser.add_argument("-sma", type=int, help='The semimajor axis of the ellipse in pixels. Def. 2 ')
     parser.add_argument("-ellip", type=float, help='Possible ellipticity. Def. 0 ')
-    parser.add_argument("-fix_ellip",type=bool, help='Force the ellipticity to be fixed.')
-    parser.add_argument("-pa", type=float, help='Possible position angle. Def. 0 ')
-    parser.add_argument("-fix_pa",type=bool, help='Force the PA to be fixed.')
-    parser.add_argument("-maxsma", type=float, help='Maximum SMA value.  Def. equal to x0  ')
-    parser.add_argument("-astep", type=float, help='The step value for growing/shrinking the semimajor axis. Def. 0.2')
-    parser.add_argument("-show", type=bool, help='Show the plots. (boolean)  ')
+    parser.add_argument("-fix_ellip",type=bool, help='Force the ellipticity to be fixed. Use it with True or 1 to activate it.')
+    parser.add_argument("-pa", type=float, help='Possible position angle. Def. 0. ')
+    parser.add_argument("-fix_pa",type=bool, help='Force the PA to be fixed. Use it with True or 1 to activate it. ')
+    parser.add_argument("-maxsma", type=float, help='Maximum SMA value.  Def. equal to x0.  ')
+    parser.add_argument("-astep", type=float, help='The step value for growing/shrinking the semimajor axis. Def. 0.2.')
+    parser.add_argument("-show", type=bool, help='Show the plots. Use it with True or 1 to activate it.')
     parser.add_argument("-bkg_scale", type=float, help='The size of the boxes used to calculate the background value. This value is connection with the image size. Def. 10  ')
-    parser.add_argument("-chk_infl", action='store_false', help='Skip checking for the third inflection point under the noise level')
-    parser.add_argument("-no_fix_ellip", action='store_false', help='Skip trying to fix Ellipticity')
-    parser.add_argument("-no_fix_pa", action='store_false', help='Skip trying to fix Position Angle')
+    parser.add_argument("-chk_infl", action='store_false', help='Skip checking for the third inflection point under the noise level.')
+    parser.add_argument("-no_fix_ellip", action='store_false', help='Skip trying to fix Ellipticity.')
+    parser.add_argument("-no_fix_pa", action='store_false', help='Skip trying to fix Position Angle.')
+    parser.add_argument("-faint", type=bool, help='If the target, is too faint for normal mode isophotal analysis, different method is used.')
     
     args = parser.parse_args()
     fits_name = args.fits_name
@@ -647,6 +660,7 @@ if __name__ == '__main__':
     chk_infl=args.chk_infl
     no_fix_ellip=args.no_fix_ellip
     no_fix_pa=args.no_fix_pa
+    faint=args.faint
  
     g_p=galaxy_photometry(fits_name, zp,target_name)
     g_p.setup_cmap()
@@ -685,7 +699,10 @@ if __name__ == '__main__':
         g_p.png_name=png_name
     if (chk_infl is not None ):
         g_p.check_intens_fluctuate=chk_infl
-          
+    if (faint):
+        g_p.faint=faint
+    
+
     g_p.get_data_from_header() # read parameters from headers 
     
     
@@ -781,7 +798,7 @@ if __name__ == '__main__':
     print("Error ellip  median", np.mean(g_p.isolist.ellip_err[:g_p.last_valid_index])) # mean ellip error value inside the galaxy
     print("Error PA median", np.mean(g_p.isolist.pa_err[:g_p.last_valid_index])) # mean PA error value inside the galaxy
     print("Zero Point", g_p.zp)
-    print("isophotal mag",np.nanmean(mag_star(zp, g_p.isolist.intens[g_p.last_valid_index-15:g_p.last_valid_index+15])))
+    print("isophotal mag",np.nanmean(mag_star(zp, g_p.isolist.intens[g_p.last_valid_index-15:g_p.last_valid_index+15]/g_p.px_scale/g_p.px_scale)))
     #Calculating SMA error     
     intens_error=np.mean(g_p.isolist.int_err[:g_p.last_valid_index])
     intens_low=g_p.isolist.intens[g_p.last_valid_index]-intens_error
@@ -807,3 +824,4 @@ if __name__ == '__main__':
     sys.stdout.close() 
 
     
+
