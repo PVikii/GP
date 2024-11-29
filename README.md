@@ -26,4 +26,10 @@ The full list of options can be seen from: ```galaxy_photometry_v2.py -h ```
 
 ## License
 
-Copyright (C) 2007 Free Software Foundation, Inc. https://fsf.org/ Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the  GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+Scientific Use: If you use this program for scientific purposes or include results derived from it in a publication, you must cite the following paper:
+Pinter V., Vaduvescu, O. Deep K-band surface brightness photometry of dE galaxies, Astronomy & Astrophysics, Volume 675, id. A90, 38 pp., 07/2023, doi: 10.1051/0004-6361/202244858
