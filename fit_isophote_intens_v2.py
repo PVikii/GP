@@ -139,18 +139,17 @@ def plotting():
     
 
     # Reaction time corrected
- #   labelFit = 'Gaussian fit\n' + r'$N$ = {:.2f}'.format(N3) + '\n' + r'$\sigma$ = {:.2f}'.format(sig3)+ '\n' + r'$\mu$ = {:.2f}'.format(m) + '\n' + r'$p_\chi$$_2$ = {:.2f}'.format(chisq)
+
     ax2.hist(res, bins=bins,color='steelblue', alpha=0.4)
     ax2.step(centers3, hist3, linestyle='-', color='lightblue', where='mid')
- #   ax2.errorbar(centers3, hist3, xerr=xerr3, yerr=yerr3, color='lightblue', drawstyle='steps-mid', linestyle='None', capsize=2)
+
     ax2.set_xlim([-2.5,2.5])
     y_gauss3 = f_gaus2(x_gauss, *popt)
     ax2.plot(x_gauss, y_gauss3, '--') #alpha=.8, label=labelFit)
 
     ax2.set_xlabel('Residuals')
     ax2.set_ylabel('Frequency')
-    #ax2.legend(loc='upper left', fontsize='x-small', framealpha=0., markerscale=2)
-  #  ax2.text(0.4, 0.55, labelFit, transform=plt.gca().transAxes)
+
 #-----------------------------------------------------------------------------------------------
     ax4 = fig.add_axes([0.23, 0.28, 0.15, 0.15])
 
@@ -168,20 +167,7 @@ def plotting():
     plt.close()
     
     file_out.write(str(chisq_score)+" : "+ str(sig3)+"\n")
-#    Ndof = len(t) - 2
-#    chi2Score = minuit_lin.fval
-#    p_P = chi2.sf(minuit_lin.fval, Ndof)
 
-#    sig_a = minuit_lin.errors[0]
-#    sig_b = minuit_lin.errors[1]
-
-#    s1 = r'$\mathbf{Resulting\ fit:}$'
-#    s2 = r'Offset = {:.4f}$\pm$'.format(b) + '{:.4f}s'.format(sig_b)
-#    s3 = r'Period = {:.4f}$\pm$'.format(2*a) + '{:.4f}s'.format(sig_a)
-#    s4 = r'$p(\chi^2={:.2f}$,'.format(chi2Score)
-#    s5 = r'$N_{dof}=$' + '{:.2f}) = '.format(Ndof) + '{:.2f}'.format(p_P)
-
-#    ax.text(2,90, s1 + '\n' + s4+s5 + '\n' + s2 + '\n' + s3, family='monospace')
 
 file_out = open('fitting_func_godness.txt', 'w')
 
@@ -242,18 +228,6 @@ for f in list_functions:
                              
 
     
-#    fig = plt.figure()
-#    ax = fig.add_subplot(111)
-#    plt.gca().invert_yaxis()
-#    plt.errorbar(sma, isophots, yerr=err_mod_isophots, color='skyblue', alpha=0.7, capsize=2,zorder=1)
-#    plt.plot(sma, f(sma,*result_copy), '-',)
-#    extra=(max(isophots) -min(isophots) )*0.05
-#    plt.ylim([max(isophots)+extra, min(isophots)-extra])
-#    plt.gca().set_xlim(left=0)
-#    xleft, xright = ax.get_xlim()
-#    ybottom, ytop = ax.get_ylim()
-#    ax.set_aspect(abs((xright-xleft)/(ybottom-ytop)))
-#    plt.legend()
     
     try: 
         print("Fitting result:",f.__name__,result_copy,result_err)
@@ -310,24 +284,7 @@ for f1 in list_functions2:
                 file_out.write("Nan : Nan \n")
                 print("\nFAILED\n")
                   
-#            fig = plt.figure()
-#            ax = fig.add_subplot(111)
-#            plt.gca().invert_yaxis()
-#            plt.errorbar(sma, isophots, yerr=err_mod_isophots, color='skyblue', alpha=0.7, capsize=2,zorder=1)
-#            plt.plot(sma, f(result_copy.params, sma, 0.,1.), '-',)
-#            extra=(max(isophots) -min(isophots) )*0.05
-#            plt.ylim([max(isophots)+extra, min(isophots)-extra])
-#            plt.gca().set_xlim(left=0)
-#            xleft, xright = ax.get_xlim()
-#            ybottom, ytop = ax.get_ylim()
-#            ax.set_aspect(abs((xright-xleft)/(ybottom-ytop)))
-#            plt.legend()
-#            plt.savefig("fit_func_result_"+f.__name__+".png")
-#                    #plt.show()
-#            plt.close()
-#            chisq1=sum(f(result_copy.params, sma,isophots,err_mod_isophots)**2)
-#            print("Chisq_verification",chisq1,result_copy.chisqr)
-#            dof=len(sma)-2. #len(result_copy.params)
+
 
         
 
